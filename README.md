@@ -74,18 +74,8 @@ npm install
 ### 3\. Apply the database schema
 
 ```bash
-npm run db:setup
+node db/run-schema.js
 ```
-
-This runs `backend/db/run-schema.js`, which reads `DATABASE_URL` from `.env` and
-executes `schema.sql` against it directly through the `pg` package — no `psql`
-CLI install needed. It creates `users`, `accounts`, `transactions`, and the
-`session` table used by `connect-pg-simple`. No fake users are seeded; register
-through the UI (or `curl`) to create real, bcrypt\-hashed accounts.
-
-Re\-running `npm run db:setup` against a database that already has the tables
-will error on the `CREATE TABLE` statements — that's expected and just means
-the schema is already applied.
 
 ### 4\. Start the backend
 
