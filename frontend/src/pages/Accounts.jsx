@@ -4,6 +4,66 @@ import Badge from '../components/Badge';
 import LoadingSpinner from '../components/LoadingSpinner';
 import api from '../api/client';
 import { formatINR, formatDate } from '../utils/format';
+import { useToast } from '../context/ToastContext';
+
+function AccountNumber({ accountId, masked }) {
+  const [revealed, setRevealed] = useState(false);
+  const [fullNumber, setFullNumber] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const toast = useToast();
+
+  const reveal = async () => {
+    if (fullNumber) {
+      setRevealed((r) => !r);
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data } = await api.get(`/account/${accountId}`);
+      setFullNumber(data.account.accountNumber);
+      setRevealed(true);
+    } catch (err) {
+      toast.showToast('Could not load full account number', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copy = async () => {
+    if (!fullNumber) return;
+    try {
+      await navigator.clipboard.writeText(fullNumber);
+      toast.showToast('Account number copied', 'success');
+    } catch (err) {
+      toast.showToast('Copy failed — select and copy manually', 'error');
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3">
+      <p className="font-mono text-lg tracking-widest text-gray-700 dark:text-gray-100">
+        {revealed && fullNumber ? fullNumber : masked}
+      </p>
+      <button
+        type="button"
+        onClick={reveal}
+        disabled={loading}
+        className="text-xs font-semibold text-navy-600 dark:text-navy-300 hover:underline disabled:opacity-50"
+      >
+        {loading ? '...' : revealed ? 'Hide' : 'Show full number'}
+      </button>
+      {revealed && fullNumber && (
+        <button
+          type="button"
+          onClick={copy}
+          className="text-xs font-semibold text-navy-600 dark:text-navy-300 hover:underline"
+        >
+          Copy
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function Accounts() {
   const [accounts, setAccounts] = useState([]);
@@ -33,7 +93,10 @@ export default function Accounts() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Accounts</h1>
-        <p className="text-gray-400 text-sm mt-1">All accounts linked to your SecureBank profile.</p>
+        <p className="text-gray-400 text-sm mt-1">
+          All accounts linked to your SecureBank profile. Tap "Show full number" to reveal and
+          copy your account number so others can transfer money to you.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -49,9 +112,7 @@ export default function Accounts() {
                   {acc.status === 'active' ? 'Active' : acc.status}
                 </Badge>
               </div>
-              <p className="font-mono text-lg tracking-widest text-gray-700 dark:text-gray-100">
-                {acc.accountNumber}
-              </p>
+              <AccountNumber accountId={acc.id} masked={acc.accountNumber} />
               <p className="text-3xl font-extrabold text-gray-800 dark:text-white mt-4">
                 {formatINR(acc.balance)}
               </p>
