@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: securebank-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: securebank
+      POSTGRES_PASSWORD: securebank
+      POSTGRES_DB: securebank
+    ports:
+      - "5432:5432"
+    volumes:
+      - securebank_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U securebank -d securebank"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  securebank_db_data:
+    name: securebank_db_data
