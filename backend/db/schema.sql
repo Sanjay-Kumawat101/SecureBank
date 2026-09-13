@@ -89,6 +89,43 @@ END $$;
 CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
 
 -- ---------------------------------------------------------------------
+-- security_settings (Phase 2+)
+--
+-- Per-control ON/OFF state for the Security Center's "Secure Mode" vs
+-- "Vulnerable Lab Mode" toggles (e.g. sqlInjection). Every control
+-- defaults to TRUE (secure) the first time the server starts and inserts
+-- a missing row -- see backend/security/securityConfig.js.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS security_settings (
+  key         TEXT PRIMARY KEY,
+  value       BOOLEAN NOT NULL DEFAULT true,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ---------------------------------------------------------------------
+-- security_logs (Phase 2+)
+--
+-- Security events raised by the vulnerability-demo lab (e.g. a detected
+-- SQL injection attempt against /api/auth/login), shown on the Security
+-- Dashboard's Attack Logs. See backend/security/securityLogger.js.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS security_logs (
+  id          SERIAL PRIMARY KEY,
+  type        TEXT NOT NULL,
+  severity    TEXT NOT NULL DEFAULT 'MEDIUM',
+  endpoint    TEXT,
+  status      TEXT NOT NULL,
+  mode        TEXT,
+  detail      TEXT,
+  ip_address  TEXT,
+  user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_security_logs_created_at ON security_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_security_logs_type ON security_logs(type);
+
+-- ---------------------------------------------------------------------
 -- Demo / seed data
 -- ---------------------------------------------------------------------
 -- No fake users are hardcoded here on purpose (Phase 1 is meant to be

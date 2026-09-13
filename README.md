@@ -1,48 +1,93 @@
-# SecureBank (Phase 1)
+# SecureBank
 
-A full\-stack demo banking web app built as the secure, functional baseline for a
-security\-education project. **Phase 1 intentionally contains no vulnerabilities** —
-parameterized SQL, bcrypt password hashing, server\-side session auth, ownership
-checks on every resource, and input validation throughout. Later phases will layer
-vulnerability demonstrations on top of this baseline inside the `/security` area
-of the app (currently a non\-functional placeholder).
+A full\-stack demo banking web app built for a security\-education project. It's
+built in phases: Phase 1 is a fully functional, secure\-by\-default banking
+application; Phase 2 adds the first vulnerability\-education module (SQL
+Injection) on top of it, with a lab toggle to switch the same code path
+between a secure and a deliberately vulnerable implementation.
 
-No Docker required — this runs against any PostgreSQL instance you already have
-(local install or a hosted database), using a connection string you provide.
+No Docker required — this runs against any PostgreSQL instance you already
+have (local install or a hosted database), using a connection string you
+provide.
 
-## Monorepo layout
+* * *
+
+## About the project
+
+SecureBank simulates a real online banking app: users register, log in, see
+an account dashboard, transfer simulated money between accounts, browse
+transaction history, and manage their profile. It's deliberately built like a
+normal fintech product first (Phase 1), so that later phases can demonstrate
+common web vulnerabilities against real, working features instead of toy
+examples — starting with SQL Injection on the login form (Phase 2).
+
+Every vulnerability phase works the same way: the vulnerable and secure
+implementations live in the same codebase, and an authenticated "Security
+Center" lets you flip between them for a live, repeatable before/after
+demonstration, with every attempt logged to an Attack Log.
+
+* * *
+
+## Repo structure
 
 ```
 securebank/
-├── backend/          Express REST API (Node.js + PostgreSQL)
+├── README.md / complete-readme.md
+├── backend/                     Express REST API (Node.js + PostgreSQL)
+│   ├── server.js                App entrypoint — loads security config, mounts all routes
+│   ├── .env.example             Copy to .env; only DATABASE_URL is required
+│   ├── package.json
 │   ├── db/
-│   │   ├── schema.sql      All tables, including the connect-pg-simple session table
-│   │   ├── run-schema.js   Applies schema.sql to DATABASE_URL (no psql needed)
-│   │   └── pool.js         pg.Pool wired to env vars, with SSL handling for hosted DBs
-│   ├── middleware/auth.js
-│   ├── routes/{auth,user,account,transfer,transactions}.js
-│   ├── utils/validate.js
-│   ├── server.js
-│   └── .env.example
-└── frontend/         React (Vite) + Tailwind CSS SPA
-    ├── src/{components,pages,context,api,utils}
-    └── .env.example
+│   │   ├── schema.sql           All tables: users, accounts, transactions, session,
+│   │   │                        security_settings, security_logs
+│   │   ├── run-schema.js        Applies schema.sql to DATABASE_URL (no psql needed)
+│   │   └── pool.js              pg.Pool, with SSL auto-detection for hosted DBs
+│   ├── middleware/
+│   │   └── auth.js              Session auth guard (requireAuth), session_version check
+│   ├── routes/
+│   │   ├── auth.js              register / login / logout (Phase 2 logic lives in login)
+│   │   ├── user.js               profile view/update, change password, logout-all-sessions
+│   │   ├── account.js            account summary + detail (ownership-checked)
+│   │   ├── transfer.js           transactional money transfer between accounts
+│   │   ├── transactions.js       transaction list (search/filter/paginate) + detail
+│   │   └── security.js           Phase 2: security control config + attack log events
+│   ├── security/
+│   │   ├── securityConfig.js     Secure/Vulnerable Lab Mode ON-OFF store (per control)
+│   │   ├── sqliDetector.js       Heuristic pattern match used to flag SQLi-shaped input
+│   │   └── securityLogger.js     Writes security events to security_logs + console
+│   └── utils/
+│       └── validate.js           Email/password/amount validation, account number helpers
+└── frontend/                    React (Vite) + Tailwind CSS SPA
+    ├── .env.example              Copy to .env; only VITE_API_URL needs checking
+    ├── package.json
+    └── src/
+        ├── pages/
+        │   ├── Login.jsx / Register.jsx
+        │   ├── Dashboard.jsx      Balance card, stat cards, recent transactions, chart
+        │   ├── Accounts.jsx       Account card with reveal/copy full account number
+        │   ├── Transfer.jsx       Review-then-confirm transfer flow
+        │   ├── Transactions.jsx   Search/filter/paginate + detail modal
+        │   ├── Profile.jsx        Edit info, change password, logout-all-sessions
+        │   └── Security.jsx       Phase 2: Security Center dashboard
+        ├── components/
+        │   ├── Button, Card, Input, Modal, Navbar, Sidebar, Badge, Table,
+        │   │   Dropdown, LoadingSpinner, DashboardLayout, ProtectedRoute
+        │   └── Toggle.jsx, SecurityStatus.jsx, SecurityEvent.jsx   (Phase 2)
+        ├── context/
+        │   ├── AuthContext.jsx    Current user, login/logout, route protection
+        │   └── ToastContext.jsx   Toast notifications
+        └── api/client.js          Axios instance (withCredentials: true)
 ```
 
-## Tech stack
+* * *
 
-- **Backend:** Node.js, Express, PostgreSQL (`pg`), `express-session` \+
-  `connect-pg-simple` for Postgres\-backed sessions, `bcrypt` for password hashing.
-- **Frontend:** React \+ Vite, Tailwind CSS, `react-router-dom`, `recharts`, `axios`
-  (`withCredentials: true` so the session cookie is sent).
+## Run steps
 
-## Prerequisites
+### Prerequisites
 
 - Node.js 18\+ and npm
 - A PostgreSQL database you can connect to — local install, or a hosted one
   (Neon, Supabase, Railway, RDS, etc.) — and its connection string
-
-## Steps to run the app
 
 ### 1\. Configure the backend environment
 
@@ -51,17 +96,17 @@ cd backend
 cp .env.example .env
 ```
 
-Edit `backend/.env` and set `DATABASE_URL` to your real connection string, e.g.:
+Edit `backend/.env` and set `DATABASE_URL` to your real connection string:
 
 ```
 DATABASE_URL=postgresql://user:password@host:5432/dbname
 ```
 
-If your provider requires SSL (most hosted ones do), add `?sslmode=require` to
-the end of the URL — `pool.js` and `run-schema.js` both detect that and enable
-SSL automatically. Everything else in `.env.example` (`SESSION_SECRET`, `PORT`,
-`CORS_ORIGIN`) has a working default baked into the code, so `DATABASE_URL` is
-the only value you must fill in to get started.
+If your provider requires SSL (most hosted ones do), add `?sslmode=require`
+to the end of the URL — `pool.js` and `run-schema.js` both detect that and
+enable SSL automatically. Everything else in `.env.example` (`SESSION_SECRET`,
+`PORT`, `CORS_ORIGIN`) has a working default baked into the code, so
+`DATABASE_URL` is the only value you must fill in.
 
 ### 2\. Install backend dependencies
 
@@ -74,8 +119,15 @@ npm install
 ### 3\. Apply the database schema
 
 ```bash
-node db/run-schema.js
+npm run db:setup
 ```
+
+Runs `backend/db/run-schema.js`, which reads `DATABASE_URL` from `.env` and
+applies `schema.sql` directly through the `pg` package — no `psql` CLI
+install needed. Safe to re\-run any time `schema.sql` changes (e.g. Phase 2
+added `security_settings` and `security_logs`) — every statement is
+`IF NOT EXISTS`, so it only adds what's missing and never touches existing
+data.
 
 ### 4\. Start the backend
 
@@ -84,7 +136,7 @@ npm run dev     # nodemon server.js, auto-restarts on change
 # or: npm start
 ```
 
-The API listens on `http://localhost:4000` by default. Health check:
+API listens on `http://localhost:4000` by default. Health check:
 `GET http://localhost:4000/api/health`.
 
 ### 5\. Configure and start the frontend
@@ -98,19 +150,17 @@ npm install
 npm run dev      # Vite dev server on http://localhost:5173
 ```
 
-`frontend/.env` only needs `VITE_API_URL` (default `http://localhost:4000/api`)
-— change it if your backend runs on a different host/port.
+`frontend/.env` only needs `VITE_API_URL` (default `http://localhost:4000/api`).
 
 ### 6\. Use the app
 
-Open `http://localhost:5173` in a browser. Register a new user — a Savings
-account with a ₹10,000.00 starting balance is created automatically — then log
-in. To test a transfer, register a second user in another browser/incognito
-window, go to their Accounts page, click "Show full number" to reveal and copy
-their account number, then send them money from the first account's Transfer
-page.
+Open `http://localhost:5173`. Register a new user — a Savings account with a
+₹10,000.00 starting balance is created automatically — then log in. To test a
+transfer, register a second user in another browser/incognito window, go to
+their Accounts page, click "Show full number" to reveal and copy their
+account number, then send them money from the first account's Transfer page.
 
-## Default ports
+### Default ports
 
 | Service | Port |
 | --- | --- |
@@ -119,70 +169,116 @@ page.
 
 (PostgreSQL port depends on wherever your database is hosted.)
 
-## Phase 1 feature checklist — everything done so far
+* * *
 
-**Auth**
+## Features
 
-- [x] Register (bcrypt\-hashed password, auto\-created Savings account, ₹10,000.00 opening balance)
-- [x] Login (Postgres\-backed express\-session, httpOnly cookie)
-- [x] Logout
-- [x] Session\-based auth middleware on every non\-auth route (401 if not logged in)
+### General banking features (Phase 1)
 
-**Profile**
+**Authentication**
 
-- [x] View/update profile (name, phone, address; email read\-only in the UI)
-- [x] Change password (requires current password)
-- [x] Logout all other sessions (`session_version` bump, checked on every request)
+- Register with name/email/password — password is bcrypt\-hashed (never stored in plaintext)
+- A Savings account is auto\-created on registration with a ₹10,000.00 demo balance
+- Login/logout with Postgres\-backed `express-session` and an httpOnly cookie
+- Session middleware protects every non\-auth route (401 if not logged in)
 
 **Accounts**
 
-- [x] Account summary (masked account number, balance, type, status)
-- [x] Account detail by id, with ownership check (no IDOR)
-- [x] Reveal \+ copy full account number from the Accounts page (added after
-  initial build — the list endpoint masks the number for security, so the
-  UI now calls the detail endpoint on demand to reveal it, so you can share
-  it with someone else to receive a transfer)
+- Account summary: masked account number, balance, type, active/inactive status
+- Full account number can be revealed and copied on demand, so you can share it
+  with someone else to receive a transfer
+- Account detail lookup is ownership\-checked (you can only ever see your own account)
 
 **Transfers**
 
-- [x] Transfer between accounts as a single DB transaction (row\-level locking,
-  balance \+ existence \+ status validation, insufficient\-funds check)
+- Transfer to another account by account number, with a review\-then\-confirm step
+- Implemented as a single database transaction with row\-level locking, so a
+  transfer can't leave balances inconsistent under concurrent requests
+- Validates sufficient balance, that the recipient account exists and is
+  active, and that you're not transferring to yourself
 
 **Transactions**
 
-- [x] List with search, credit/debit filter, date range, and pagination
-- [x] Transaction detail by id, ownership\-checked
+- Full transaction history, searchable by description, filterable by
+  credit/debit and date range, paginated
+- Transaction detail view, ownership\-checked
+
+**Profile**
+
+- View/edit name, phone, address
+- Change password (requires current password)
+- "Logout all other sessions" — invalidates every other active session immediately
 
 **Frontend**
 
-- [x] Login / Register pages
-- [x] Dashboard: greeting, balance card, income/expense/savings stat cards,
-  recent transactions, income vs. expense chart (recharts)
-- [x] Accounts page with masked\-by\-default account number, reveal \+ copy, and status badge
-- [x] Transfer page with a review/confirm step before submission
-- [x] Transactions page: search, filter, date range, pagination, detail modal
-- [x] Profile page: edit info, change password, logout\-all\-sessions
-- [x] Security Center placeholder (visually distinct purple accent, disabled
-  "coming soon" cards for future vulnerability\-education phases)
-- [x] Responsive layout (sidebar collapses on mobile), basic dark mode toggle
+- Dashboard with balance card, income/expense/savings stat cards, recent
+  transactions, and an income\-vs\-expense chart
+- Responsive layout (sidebar collapses on mobile), basic dark mode toggle
+- Consistent design system: reusable Button, Card, Input, Modal, Table, Badge,
+  Toast, Dropdown, Sidebar/Navbar components
 
-**Local setup / DX**
+### Security features added in Phase 2 (SQL Injection)
 
-- [x] Runs without Docker — any reachable PostgreSQL connection string works
-- [x] `db/run-schema.js` applies the schema via `npm run db:setup` (no `psql` install required)
-- [x] `.env.example` trimmed to require only `DATABASE_URL`; everything else defaults sensibly in code
-- [x] `pool.js` auto\-enables SSL when `DATABASE_URL` includes `sslmode=require` (needed by most hosted Postgres providers)
+- **Security Center dashboard** (`/security`): an authenticated control panel
+  showing every security control's live status, a step\-by\-step test guide,
+  and a real\-time Attack Log feed.
+- **Secure vs. Vulnerable Lab Mode toggle** for `POST /api/auth/login`,
+  backed by a `sqlInjection` flag stored in a new `security_settings` table:
+  - **Secure Mode (default):** strict email\-format validation, then a
+    parameterized query — `WHERE email = $1` with the value passed as a bind
+    parameter. User input can never be interpreted as SQL syntax.
+  - **Vulnerable Lab Mode:** format validation is skipped and the WHERE
+    clause is built by concatenating the raw email string into the SQL text
+    — `WHERE email = '${email}'` — reproducing the classic unsafe pattern on
+    purpose, gated behind this authenticated toggle only.
+- **Authenticated\-only lab control:** the toggle is only reachable via
+  `GET/PUT /api/security/config`, both behind `requireAuth` — there is no
+  public/unauthenticated way to disable a security control, by design.
+- **SQL injection pattern detection:** a lightweight heuristic
+  (`sqliDetector.js`) flags SQLi\-shaped input (`' OR '1'='1`, `--`, `UNION SELECT`, stacked statements, etc.) regardless of which mode is active.
+- **Persistent Attack Log:** every detected attempt is written to a new
+  `security_logs` table via `securityLogger.js`, recording type, severity,
+  endpoint, status (`DETECTED` in Vulnerable Mode, `BLOCKED` in Secure Mode),
+  which mode was active, and a human\-readable detail message (e.g. "query
+  returned 4 row(s) instead of the expected 0 or 1"). Viewable live on the
+  Security Center's Attack Logs panel via `GET /api/security/events`.
+- **Config\-change auditing:** flipping any control itself logs a
+  `CONFIG_CHANGE` security event, so there's a record of who put the app into
+  Vulnerable Lab Mode and when.
+- **Verified vulnerability \+ fix, side by side:** the same `' OR '1'='1' --`
+  request, run once against each mode, produces a confirmed VULNERABLE result
+  (query returns unintended rows) and then a confirmed BLOCKED result (query
+  returns 0 or 1 rows as expected) — the exact before/after evidence the
+  project's checklist calls for.
+- **Room for later phases:** `security_settings` already stores seven more
+  controls (`xssProtection`, `authorization`, `csrfProtection`,
+  `secureCookies`, `rateLimiting`, `securityHeaders`, `inputValidation`) and
+  the Security Center UI already lists them as "Coming soon" — future phases
+  can wire each one into a route the same way Phase 2 did for SQL injection.
+
+**Important nuance for your presentation:** with SQL Injection Protection
+off, the `' OR '1'='1' --` payload does alter the query (it returns every
+user row instead of 0 or 1 — confirmed evidence of the vulnerability, visible
+in the Attack Log), but the login attempt itself still fails with the same
+generic "Invalid email or password" message. That's because password
+verification happens in application code (`bcrypt.compare`) against the real
+password hash, not inside the SQL — so this specific payload proves the
+query was compromised without by itself granting a full login bypass. A more
+advanced UNION\-based payload could achieve a full bypass; that's a possible
+stretch addition, not part of the current implementation.
+
+* * *
 
 ## Notes / known gaps
 
-- Each user has exactly one (Savings) account in Phase 1, created at
-  registration; the schema and transfer logic don't prevent multiple accounts
-  per user, but nothing in the UI creates a second one yet.
-- `connect-pg-simple` is configured with `createTableIfMissing: false` because
-  `schema.sql` is meant to be the single source of truth for the DB — flip that
-  flag if you'd rather let the library manage the session table itself.
-- This was built and syntax/schema\-checked in a sandboxed environment without
-  full npm registry access, so a live `npm install` \+ end\-to\-end run happened
-  on your machine, not during initial development. If you hit an install or
-  runtime error the notes above don't cover, share the exact error and it can
-  be fixed directly.
+- Each user has exactly one (Savings) account, created at registration; the
+  schema and transfer logic don't prevent multiple accounts per user, but
+  nothing in the UI creates a second one yet.
+- `connect-pg-simple` is configured with `createTableIfMissing: false`
+  because `schema.sql` is the single source of truth for the DB schema.
+- Only the `sqlInjection` control actually changes backend behavior right
+  now; the other seven controls are placeholders for later phases.
+- This was built and syntax/schema\-checked in a sandboxed environment
+  without full npm registry access, so live `npm install` \+ end\-to\-end runs
+  happen on your machine. If you hit an install or runtime error not covered
+  here, share the exact error.

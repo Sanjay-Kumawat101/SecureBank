@@ -12,6 +12,9 @@ const userRoutes = require('./routes/user');
 const accountRoutes = require('./routes/account');
 const transferRoutes = require('./routes/transfer');
 const transactionRoutes = require('./routes/transactions');
+const securityRoutes = require('./routes/security');
+
+const { loadSecurityConfig } = require('./security/securityConfig');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -61,6 +64,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/account', accountRoutes);
 app.use('/api/transfer', transferRoutes);
 app.use('/api/transactions', transactionRoutes);
+app.use('/api/security', securityRoutes);
 
 // 404 handler
 app.use('/api', (req, res) => {
@@ -74,8 +78,21 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`SecureBank backend listening on port ${PORT}`);
+async function start() {
+  // Load the Security Center's control values (secure/vulnerable per
+  // control, e.g. sqlInjection) from the DB before accepting any requests,
+  // so the very first login attempt sees the correct mode.
+  await loadSecurityConfig();
+
+  app.listen(PORT, () => {
+    console.log(`SecureBank backend listening on port ${PORT}`);
+  });
+}
+
+start().catch((err) => {
+  // eslint-disable-next-line no-console
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
 
 module.exports = app;

@@ -52,10 +52,15 @@ export default function Login() {
             </div>
           )}
 
+          {/* Email field is intentionally type="text", not type="email": Phase 2's
+              SQL injection lab needs to submit payloads (e.g. ' OR '1'='1' --)
+              that don't look like a real email address, and the browser's
+              built-in type="email" validation would block that submission
+              client-side before it ever reached the server. */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               label="Email address"
-              type="email"
+              type="text"
               name="email"
               autoComplete="email"
               required
