@@ -12,20 +12,18 @@ const pool = require('../db/pool');
  * like `GET /disable-security` in a real deployment. Deliberately disabling
  * security controls on a live system would itself be a security problem.
  *
- * Only `sqlInjection` is actually wired into any route as of Phase 2 (see
- * routes/auth.js). The rest exist now so the Security Center's control
- * panel and the `security_settings` table already have a stable shape for
- * later phases (XSS, IDOR, CSRF, etc.) to plug into.
+ * Phase 3 wires `inputValidation`, `xssProtection`, and `authorization` into
+ * the profile, transfer, account, and transaction routes.
  */
 const DEFAULTS = {
   sqlInjection: true, // true = parameterized queries on /api/auth/login (secure)
-  xssProtection: true, // reserved for a later phase
-  authorization: true, // reserved for a later phase (IDOR)
+  xssProtection: true, // sanitize user-controlled text on write and read
+  authorization: true, // enforce ownership checks on object lookups (IDOR)
   csrfProtection: true, // reserved for a later phase
   secureCookies: true, // reserved for a later phase
   rateLimiting: true, // reserved for a later phase
   securityHeaders: true, // reserved for a later phase
-  inputValidation: true, // reserved for a later phase
+  inputValidation: true, // enforce route input constraints
 };
 
 let cache = { ...DEFAULTS };

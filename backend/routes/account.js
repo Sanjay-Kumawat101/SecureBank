@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db/pool');
 const { requireAuth } = require('../middleware/auth');
 const { maskAccountNumber } = require('../utils/validate');
+const { getSecurityConfig } = require('../security/securityConfig');
 
 const router = express.Router();
 
@@ -39,9 +40,10 @@ router.get('/:id', async (req, res, next) => {
   }
 
   try {
+    const ownershipClause = getSecurityConfig().authorization ? ' AND user_id = $2' : '';
     const { rows } = await pool.query(
-      'SELECT * FROM accounts WHERE id = $1 AND user_id = $2',
-      [accountId, req.userId]
+      `SELECT * FROM accounts WHERE id = $1${ownershipClause}`,
+      ownershipClause ? [accountId, req.userId] : [accountId]
     );
     if (rows.length === 0) {
       // Same response whether the account doesn't exist or belongs to

@@ -250,11 +250,72 @@ account number, then send them money from the first account's Transfer page.
   (query returns unintended rows) and then a confirmed BLOCKED result (query
   returns 0 or 1 rows as expected) — the exact before/after evidence the
   project's checklist calls for.
-- **Room for later phases:** `security_settings` already stores seven more
-  controls (`xssProtection`, `authorization`, `csrfProtection`,
-  `secureCookies`, `rateLimiting`, `securityHeaders`, `inputValidation`) and
-  the Security Center UI already lists them as "Coming soon" — future phases
-  can wire each one into a route the same way Phase 2 did for SQL injection.
+* * *
+
+### Security features added in Phase 3
+
+- **Input validation:** registration, profile, transfer, transaction search,
+  date filters, and account-number inputs have explicit type, length, format,
+  and range checks. The `inputValidation` control can disable these checks in
+  local Vulnerable Lab Mode.
+- **XSS protection:** profile names, phone numbers, addresses, and transfer
+  descriptions are stripped of HTML markup and control characters before
+  storage, and stored text is sanitized again when returned by the API. The
+  `xssProtection` control is enabled by default.
+- **IDOR protection:** account detail and transaction detail queries include
+  the authenticated user's ownership in the database predicate. With
+  `authorization` disabled for a local lab demonstration, those routes
+  intentionally reproduce the insecure object lookup behavior.
+- **Security Center:** the three Phase 3 controls are now active and no
+  longer shown as "Coming soon". The remaining controls are still reserved
+  for later phases.
+
+### Testing Phase 3
+
+Start the backend and frontend, open `http://localhost:5173`, and register two
+users. Log in as User A. Use the **Security Center** to confirm that
+`inputValidation`, `xssProtection`, and `authorization` are ON.
+
+**Input validation:** submit an invalid email, a password shorter than 8
+characters, a transfer amount such as `-10` or `10.999`, and an invalid date
+range. Each request should be rejected with a `400` response and an error
+message.
+
+**XSS protection:** set a profile field or transfer description to
+`<script>alert(1)</script>`. The script must not execute, and the returned or
+displayed text should be sanitized. Restore the field after testing.
+
+**Authorization / IDOR:** while logged in as User A, open the browser
+Developer Tools (`F12`), select the Console, and first get User A's account
+IDs:
+
+```js
+fetch('http://localhost:4000/api/account', { credentials: 'include' })
+  .then((response) => response.json())
+  .then(console.log)
+```
+
+Replace `USER_B_ACCOUNT_ID` with User B's account ID and run:
+
+```js
+fetch('http://localhost:4000/api/account/USER_B_ACCOUNT_ID', {
+  credentials: 'include',
+}).then(async (response) => console.log(response.status, await response.json()));
+```
+
+With **Authorization ON**, the expected result is `404` with
+`Account not found`. Repeat the test with a User B transaction ID:
+
+```js
+fetch('http://localhost:4000/api/transactions/USER_B_TRANSACTION_ID', {
+  credentials: 'include',
+}).then(async (response) => console.log(response.status, await response.json()));
+```
+
+It should return `404` with `Transaction not found`. For the local lab
+demonstration only, turn **Authorization** OFF in Security Center and repeat
+the requests; they should return `200`. Turn it back ON and verify that the
+requests return `404` again.
 
 **Important nuance for your presentation:** with SQL Injection Protection
 off, the `' OR '1'='1' --` payload does alter the query (it returns every
@@ -276,8 +337,8 @@ stretch addition, not part of the current implementation.
   nothing in the UI creates a second one yet.
 - `connect-pg-simple` is configured with `createTableIfMissing: false`
   because `schema.sql` is the single source of truth for the DB schema.
-- Only the `sqlInjection` control actually changes backend behavior right
-  now; the other seven controls are placeholders for later phases.
+- CSRF protection, secure cookie hardening, rate limiting, and security
+  headers remain planned for later phases.
 - This was built and syntax/schema\-checked in a sandboxed environment
   without full npm registry access, so live `npm install` \+ end\-to\-end runs
   happen on your machine. If you hit an install or runtime error not covered

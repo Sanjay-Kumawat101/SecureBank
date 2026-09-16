@@ -1,6 +1,8 @@
 const express = require('express');
 const pool = require('../db/pool');
 const { requireAuth } = require('../middleware/auth');
+const { getSecurityConfig } = require('../security/securityConfig');
+const { isValidDate, sanitizeText } = require('../utils/validate');
 
 const router = express.Router();
 
@@ -24,7 +26,7 @@ function serializeForUser(row, accountIds) {
   return {
     id: row.id,
     amount: row.amount,
-    description: row.description,
+    description: getSecurityConfig().xssProtection ? sanitizeText(row.description, 255) : row.description,
     direction,
     status: row.status,
     createdAt: row.created_at,
@@ -49,6 +51,21 @@ router.get('/', async (req, res, next) => {
       page: pageRaw,
       limit: limitRaw,
     } = req.query;
+
+    if (getSecurityConfig().inputValidation) {
+      if (search !== undefined && (typeof search !== 'string' || search.length > 100)) {
+        return res.status(400).json({ error: 'Search text is too long' });
+      }
+      if (startDate !== undefined && !isValidDate(startDate)) {
+        return res.status(400).json({ error: 'Invalid start date' });
+      }
+      if (endDate !== undefined && !isValidDate(endDate)) {
+        return res.status(400).json({ error: 'Invalid end date' });
+      }
+      if (startDate && endDate && startDate > endDate) {
+        return res.status(400).json({ error: 'Start date must be before end date' });
+      }
+    }
 
     const page = Math.max(1, parseInt(pageRaw, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(limitRaw, 10) || 20));
@@ -121,11 +138,15 @@ router.get('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
-    const { rows } = await pool.query(
-      `SELECT * FROM transactions
-       WHERE id = $1 AND (sender_account_id = ANY($2::int[]) OR receiver_account_id = ANY($2::int[]))`,
-      [txId, accountIds]
-    );
+    const authorization = getSecurityConfig().authorization;
+    const result = authorization
+      ? await pool.query(
+          `SELECT * FROM transactions
+           WHERE id = $1 AND (sender_account_id = ANY($2::int[]) OR receiver_account_id = ANY($2::int[]))`,
+          [txId, accountIds]
+        )
+      : await pool.query('SELECT * FROM transactions WHERE id = $1', [txId]);
+    const { rows } = result;
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Transaction not found' });
     }

@@ -2,7 +2,8 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const pool = require('../db/pool');
 const { requireAuth } = require('../middleware/auth');
-const { isValidPassword, isNonEmptyString } = require('../utils/validate');
+const { isValidPassword, isNonEmptyString, sanitizeText } = require('../utils/validate');
+const { getSecurityConfig } = require('../security/securityConfig');
 
 const router = express.Router();
 const SALT_ROUNDS = 12;
@@ -17,7 +18,13 @@ router.get('/profile', async (req, res, next) => {
       [req.userId]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
-    res.json({ user: rows[0] });
+    const user = rows[0];
+    if (getSecurityConfig().xssProtection) {
+      user.name = sanitizeText(user.name, 120);
+      user.phone = sanitizeText(user.phone, 30);
+      user.address = sanitizeText(user.address, 500);
+    }
+    res.json({ user });
   } catch (err) {
     next(err);
   }
@@ -26,22 +33,27 @@ router.get('/profile', async (req, res, next) => {
 // PUT /api/user/profile
 router.put('/profile', async (req, res, next) => {
   const { name, phone, address } = req.body || {};
+  const config = getSecurityConfig();
 
-  if (name !== undefined && !isNonEmptyString(name, 120)) {
+  if (config.inputValidation && name !== undefined && !isNonEmptyString(name, 120)) {
     return res.status(400).json({ error: 'Name cannot be empty' });
   }
-  if (phone !== undefined && phone !== null && typeof phone !== 'string') {
+  if (config.inputValidation && phone !== undefined && phone !== null && typeof phone !== 'string') {
     return res.status(400).json({ error: 'Invalid phone value' });
   }
-  if (phone !== undefined && phone !== null && phone.length > 30) {
+  if (config.inputValidation && phone !== undefined && phone !== null && phone.length > 30) {
     return res.status(400).json({ error: 'Phone number too long' });
   }
-  if (address !== undefined && address !== null && typeof address !== 'string') {
+  if (config.inputValidation && address !== undefined && address !== null && typeof address !== 'string') {
     return res.status(400).json({ error: 'Invalid address value' });
   }
-  if (address !== undefined && address !== null && address.length > 500) {
+  if (config.inputValidation && address !== undefined && address !== null && address.length > 500) {
     return res.status(400).json({ error: 'Address too long' });
   }
+
+  const safeName = config.xssProtection && name !== undefined ? sanitizeText(name, 120).trim() : name;
+  const safePhone = config.xssProtection && typeof phone === 'string' ? sanitizeText(phone, 30).trim() : phone;
+  const safeAddress = config.xssProtection && typeof address === 'string' ? sanitizeText(address, 500).trim() : address;
 
   try {
     const { rows } = await pool.query(
@@ -51,7 +63,7 @@ router.put('/profile', async (req, res, next) => {
            address = COALESCE($3, address)
        WHERE id = $4
        RETURNING id, name, email, phone, address, created_at`,
-      [name ?? null, phone ?? null, address ?? null, req.userId]
+      [safeName ?? null, safePhone ?? null, safeAddress ?? null, req.userId]
     );
     res.json({ user: rows[0] });
   } catch (err) {
