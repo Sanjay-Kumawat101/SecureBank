@@ -34,6 +34,12 @@ router.post('/register', async (req, res, next) => {
   const safeName = config.xssProtection && typeof name === 'string' ? sanitizeText(name, 120).trim() : name;
   const registrationName = typeof safeName === 'string' ? safeName.trim() : safeName;
 
+  if (config.xssProtection && !isNonEmptyString(registrationName, 120)) {
+    return res.status(400).json({
+      error: 'Name contains invalid content or cannot be empty',
+    });
+  }
+
   const client = await pool.connect();
   try {
     const normalizedEmail = email.trim().toLowerCase();

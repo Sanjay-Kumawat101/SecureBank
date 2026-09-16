@@ -35,9 +35,6 @@ router.put('/profile', async (req, res, next) => {
   const { name, phone, address } = req.body || {};
   const config = getSecurityConfig();
 
-  if (config.inputValidation && name !== undefined && !isNonEmptyString(name, 120)) {
-    return res.status(400).json({ error: 'Name cannot be empty' });
-  }
   if (config.inputValidation && phone !== undefined && phone !== null && typeof phone !== 'string') {
     return res.status(400).json({ error: 'Invalid phone value' });
   }
@@ -51,9 +48,16 @@ router.put('/profile', async (req, res, next) => {
     return res.status(400).json({ error: 'Address too long' });
   }
 
-  const safeName = config.xssProtection && name !== undefined ? sanitizeText(name, 120).trim() : name;
+  const safeName = config.xssProtection && typeof name === 'string' ? sanitizeText(name, 120).trim() : name;
   const safePhone = config.xssProtection && typeof phone === 'string' ? sanitizeText(phone, 30).trim() : phone;
   const safeAddress = config.xssProtection && typeof address === 'string' ? sanitizeText(address, 500).trim() : address;
+
+  if (config.inputValidation && name !== undefined && !isNonEmptyString(name, 120)) {
+    return res.status(400).json({ error: 'Name cannot be empty' });
+  }
+  if (config.xssProtection && name !== undefined && (!isNonEmptyString(safeName, 120) || safeName !== name.trim())) {
+    return res.status(400).json({ error: 'Name contains invalid content or cannot be empty' });
+  }
 
   try {
     const { rows } = await pool.query(
