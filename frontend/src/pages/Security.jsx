@@ -54,21 +54,24 @@ const CONTROLS = [
   },
   {
     key: 'secureCookies',
-    label: 'Secure Cookies',
-    description: 'Secure cookie hardening is planned for a later phase.',
-    implemented: false,
+    label: 'Session Security',
+    description:
+      'Protects sessions using HttpOnly cookies, SameSite protection, and session ID regeneration.',
+    implemented: true,
   },
   {
     key: 'rateLimiting',
     label: 'Rate Limiting',
-    description: 'Rate limiting is planned for a later phase.',
-    implemented: false,
+    description:
+      'Limits repeated login requests to reduce brute-force and automated attacks.',
+    implemented: true,
   },
   {
     key: 'securityHeaders',
     label: 'Security Headers',
-    description: 'Security headers are planned for a later phase.',
-    implemented: false,
+    description:
+      'Adds browser security headers such as CSP, X-Content-Type-Options, X-Frame-Options, and Referrer-Policy.',
+    implemented: true,
   },
 ];
 
@@ -226,7 +229,130 @@ export default function Security() {
             </div>
           </div>
         </Card>
+
+        <Card
+          title="Session Security Test"
+          subtitle="Demonstrates session cookie protection using browser developer tools."
+        >
+          <div className="space-y-4">
+
+            <div className="rounded-xl border border-gray-100 dark:border-navy-800 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                HttpOnly Protection
+              </p>
+
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium text-gray-800 dark:text-gray-100">
+                    JavaScript Cookie Access
+                  </p>
+
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {config.secureCookies
+                      ? 'HttpOnly prevents JavaScript from directly accessing the session cookie.'
+                      : 'HttpOnly is disabled, allowing JavaScript to access the session cookie.'}
+                  </p>
+                </div>
+
+                <Badge variant={config.secureCookies ? 'success' : 'danger'}>
+                  {config.secureCookies ? 'ENABLED' : 'DISABLED'}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-100 dark:border-navy-800 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                SameSite Protection
+              </p>
+
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium text-gray-800 dark:text-gray-100">
+                    Cross-Site Cookie Protection
+                  </p>
+
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {config.secureCookies
+                      ? 'SameSite=Lax restricts cross-site transmission of the session cookie.'
+                      : 'SameSite protection is disabled in Vulnerable Lab Mode.'}
+                  </p>
+                </div>
+
+                <Badge variant={config.secureCookies ? 'success' : 'danger'}>
+                  {config.secureCookies ? 'LAX' : 'DISABLED'}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-100 dark:border-navy-800 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                Session Cookie
+              </p>
+
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium text-gray-800 dark:text-gray-100">
+                    securebank.sid
+                  </p>
+
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {config.secureCookies
+                      ? 'Session cookie is hardened with HttpOnly and SameSite protections.'
+                      : 'Session cookie is intentionally exposed to demonstrate weaker session security.'}
+                  </p>
+                </div>
+
+                <Badge variant={config.secureCookies ? 'success' : 'danger'}>
+                  {config.secureCookies ? 'HARDENED' : 'VULNERABLE'}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 dark:bg-navy-900/50 border border-gray-100 dark:border-navy-800 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                Current Mode
+              </p>
+
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {config.secureCookies
+                  ? 'Secure Mode: HttpOnly and SameSite=Lax protections are enabled for the session cookie.'
+                  : 'Vulnerable Lab Mode: HttpOnly and SameSite protections are disabled for demonstration.'}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-blue-100 bg-blue-50 dark:border-blue-900/40 dark:bg-blue-900/10 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-2">
+                How to test it
+              </p>
+
+              <ol className="text-sm text-gray-600 dark:text-gray-300 list-decimal list-inside space-y-1">
+                <li>Log in while Session Security is ON.</li>
+                <li>Open F12 → Application → Cookies.</li>
+                <li>Select the <code className="px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-xs">securebank.sid</code> cookie.</li>
+                <li>Verify that HttpOnly is enabled and SameSite is set to Lax.</li>
+                <li>Turn Session Security OFF and refresh the application.</li>
+                <li>Check <code className="px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-xs">securebank.sid</code> again.</li>
+                <li>Verify that HttpOnly and SameSite protections are disabled.</li>
+              </ol>
+            </div>
+
+            <div className="rounded-xl border border-amber-100 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/10 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400 mb-2">
+                Local Testing Note
+              </p>
+
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                The Secure cookie flag is not enabled on localhost because the
+                application is running over HTTP. In a production HTTPS deployment,
+                Secure is enabled automatically in Secure Mode.
+              </p>
+            </div>
+
+          </div>
+        </Card>
+
       </div>
+
 
       <Card
         title="Attack Logs"
