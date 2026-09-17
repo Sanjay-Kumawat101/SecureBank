@@ -1,8 +1,15 @@
 const express = require('express');
 const pool = require('../db/pool');
 const { requireAuth } = require('../middleware/auth');
-const { isValidAmount, isNonEmptyString, isValidAccountNumber, sanitizeText } = require('../utils/validate');
+const {
+  isValidAmount,
+  isNonEmptyString,
+  isValidAccountNumber,
+  sanitizeText,
+} = require('../utils/validate');
 const { getSecurityConfig } = require('../security/securityConfig');
+const { requireCsrf } = require('../security/csrf');
+const { logSecurityEvent } = require('../security/securityLogger');
 
 const router = express.Router();
 
@@ -13,29 +20,137 @@ router.post('/', async (req, res, next) => {
   const { recipientAccountNumber, amount, description } = req.body || {};
   const config = getSecurityConfig();
 
-  const normalizedRecipient = typeof recipientAccountNumber === 'string' ? recipientAccountNumber.trim() : recipientAccountNumber;
-  if (config.inputValidation && !isValidAccountNumber(normalizedRecipient)) {
-    return res.status(400).json({ error: 'Recipient account number must be 12 digits' });
+  /*
+   * ---------------------------------------------------------------
+   * CSRF PROTECTION
+   * ---------------------------------------------------------------
+   *
+   * Secure Mode:
+   *   requireCsrf verifies the session-bound X-CSRF-Token header.
+   *
+   * Vulnerable Lab Mode:
+   *   requireCsrf deliberately skips validation.
+   *
+   * The check happens before any database transaction begins, so a
+   * rejected CSRF request can never modify account balances.
+   */
+  if (config.csrfProtection) {
+    const csrfHeader = req.get('x-csrf-token');
+
+    if (!csrfHeader) {
+      await logSecurityEvent({
+        type: 'CSRF',
+        severity: 'HIGH',
+        endpoint: '/api/transfer',
+        status: 'BLOCKED',
+        mode: 'SECURE',
+        detail: 'Transfer request rejected because the CSRF token was missing',
+        ip: req.ip,
+        userId: req.userId,
+      });
+
+      return res.status(403).json({
+        error: 'CSRF validation failed',
+        code: 'CSRF_TOKEN_MISSING',
+      });
+    }
+
+    const expectedToken = req.session?.csrfToken;
+
+    if (!expectedToken || csrfHeader !== expectedToken) {
+      await logSecurityEvent({
+        type: 'CSRF',
+        severity: 'HIGH',
+        endpoint: '/api/transfer',
+        status: 'BLOCKED',
+        mode: 'SECURE',
+        detail: 'Transfer request rejected because the CSRF token was invalid',
+        ip: req.ip,
+        userId: req.userId,
+      });
+
+      return res.status(403).json({
+        error: 'CSRF validation failed',
+        code: 'CSRF_TOKEN_INVALID',
+      });
+    }
+  } else {
+    await logSecurityEvent({
+      type: 'CSRF',
+      severity: 'MEDIUM',
+      endpoint: '/api/transfer',
+      status: 'VULNERABLE',
+      mode: 'VULNERABLE',
+      detail: 'CSRF protection disabled; transfer request accepted without token validation',
+      ip: req.ip,
+      userId: req.userId,
+    });
   }
-  if (!config.inputValidation && (typeof recipientAccountNumber !== 'string' || recipientAccountNumber.trim().length === 0)) {
-    return res.status(400).json({ error: 'Recipient account number is required' });
+
+  const normalizedRecipient =
+    typeof recipientAccountNumber === 'string'
+      ? recipientAccountNumber.trim()
+      : recipientAccountNumber;
+
+  if (
+    config.inputValidation &&
+    !isValidAccountNumber(normalizedRecipient)
+  ) {
+    return res.status(400).json({
+      error: 'Recipient account number must be 12 digits',
+    });
   }
+
+  if (
+    !config.inputValidation &&
+    (
+      typeof recipientAccountNumber !== 'string' ||
+      recipientAccountNumber.trim().length === 0
+    )
+  ) {
+    return res.status(400).json({
+      error: 'Recipient account number is required',
+    });
+  }
+
   if (config.inputValidation && !isValidAmount(amount)) {
-    return res.status(400).json({ error: 'Amount must be a positive number with at most 2 decimal places' });
+    return res.status(400).json({
+      error: 'Amount must be a positive number with at most 2 decimal places',
+    });
   }
-  if (config.inputValidation && description !== undefined && description !== null) {
+
+  if (
+    config.inputValidation &&
+    description !== undefined &&
+    description !== null
+  ) {
     if (typeof description !== 'string' || description.length > 255) {
-      return res.status(400).json({ error: 'Description is too long' });
+      return res.status(400).json({
+        error: 'Description is too long',
+      });
     }
   }
 
   const transferAmount = Number(amount).toFixed(2);
-  const recipientNumber = typeof normalizedRecipient === 'string' ? normalizedRecipient : '';
+
+  const recipientNumber =
+    typeof normalizedRecipient === 'string'
+      ? normalizedRecipient
+      : '';
+
   const safeDescription = config.xssProtection
-    ? sanitizeText(isNonEmptyString(description, 255) ? description.trim() : 'Transfer', 255)
-    : isNonEmptyString(description, 255) ? description.trim() : 'Transfer';
+    ? sanitizeText(
+      isNonEmptyString(description, 255)
+        ? description.trim()
+        : 'Transfer',
+      255
+    )
+    : isNonEmptyString(description, 255)
+      ? description.trim()
+      : 'Transfer';
 
   const client = await pool.connect();
+
   try {
     await client.query('BEGIN');
 
@@ -45,54 +160,86 @@ router.post('/', async (req, res, next) => {
       'SELECT * FROM accounts WHERE user_id = $1 ORDER BY id ASC LIMIT 1 FOR UPDATE',
       [req.userId]
     );
+
     const senderAccount = senderResult.rows[0];
+
     if (!senderAccount) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Sender account not found' });
+      return res.status(404).json({
+        error: 'Sender account not found',
+      });
     }
+
     if (senderAccount.status !== 'active') {
       await client.query('ROLLBACK');
-      return res.status(403).json({ error: 'Your account is not active' });
+      return res.status(403).json({
+        error: 'Your account is not active',
+      });
     }
 
     if (senderAccount.account_number === recipientNumber) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'Cannot transfer to your own account' });
+      return res.status(400).json({
+        error: 'Cannot transfer to your own account',
+      });
     }
 
     const receiverResult = await client.query(
       'SELECT * FROM accounts WHERE account_number = $1 FOR UPDATE',
       [recipientNumber]
     );
+
     const receiverAccount = receiverResult.rows[0];
+
     if (!receiverAccount) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Recipient account does not exist' });
+      return res.status(404).json({
+        error: 'Recipient account does not exist',
+      });
     }
+
     if (receiverAccount.status !== 'active') {
       await client.query('ROLLBACK');
-      return res.status(403).json({ error: 'Recipient account is not active' });
+      return res.status(403).json({
+        error: 'Recipient account is not active',
+      });
     }
 
     if (Number(senderAccount.balance) < Number(transferAmount)) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'Insufficient balance' });
+      return res.status(400).json({
+        error: 'Insufficient balance',
+      });
     }
 
-    await client.query('UPDATE accounts SET balance = balance - $1 WHERE id = $2', [
-      transferAmount,
-      senderAccount.id,
-    ]);
-    await client.query('UPDATE accounts SET balance = balance + $1 WHERE id = $2', [
-      transferAmount,
-      receiverAccount.id,
-    ]);
+    await client.query(
+      'UPDATE accounts SET balance = balance - $1 WHERE id = $2',
+      [
+        transferAmount,
+        senderAccount.id,
+      ]
+    );
+
+    await client.query(
+      'UPDATE accounts SET balance = balance + $1 WHERE id = $2',
+      [
+        transferAmount,
+        receiverAccount.id,
+      ]
+    );
 
     const txResult = await client.query(
-      `INSERT INTO transactions (sender_account_id, receiver_account_id, amount, description, type, status)
-       VALUES ($1, $2, $3, $4, 'debit', 'completed')
+      `INSERT INTO transactions
+        (sender_account_id, receiver_account_id, amount, description, type, status)
+       VALUES
+        ($1, $2, $3, $4, 'debit', 'completed')
        RETURNING *`,
-      [senderAccount.id, receiverAccount.id, transferAmount, safeDescription]
+      [
+        senderAccount.id,
+        receiverAccount.id,
+        transferAmount,
+        safeDescription,
+      ]
     );
 
     await client.query('COMMIT');

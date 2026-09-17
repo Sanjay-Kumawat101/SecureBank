@@ -1,7 +1,15 @@
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
-const { getSecurityConfig, setSecurityControl, DEFAULTS } = require('../security/securityConfig');
-const { logSecurityEvent, getRecentEvents } = require('../security/securityLogger');
+const {
+  getSecurityConfig,
+  setSecurityControl,
+  DEFAULTS,
+} = require('../security/securityConfig');
+const {
+  logSecurityEvent,
+  getRecentEvents,
+} = require('../security/securityLogger');
+const { getOrCreateCsrfToken } = require('../security/csrf');
 
 const router = express.Router();
 
@@ -16,13 +24,32 @@ router.get('/config', (req, res) => {
   res.json({ config: getSecurityConfig() });
 });
 
-// PUT /api/security/config   body: { key, value }
+// GET /api/security/csrf-token
+//
+// Returns the CSRF token belonging to the currently authenticated session.
+// The token is intentionally returned through an authenticated API call;
+// it is not stored in a separate cookie.
+router.get('/csrf-token', (req, res, next) => {
+  try {
+    const token = getOrCreateCsrfToken(req);
+
+    res.json({
+      csrfToken: token,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/security/config
+// body: { key, value }
 router.put('/config', async (req, res, next) => {
   const { key, value } = req.body || {};
 
   if (typeof key !== 'string' || !(key in DEFAULTS)) {
     return res.status(400).json({ error: 'Unknown security control' });
   }
+
   if (typeof value !== 'boolean') {
     return res.status(400).json({ error: 'value must be true or false' });
   }
@@ -54,6 +81,7 @@ router.get('/events', async (req, res, next) => {
       limit: req.query.limit,
       type: req.query.type || null,
     });
+
     res.json({ events });
   } catch (err) {
     next(err);

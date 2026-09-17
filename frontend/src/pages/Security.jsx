@@ -48,8 +48,9 @@ const CONTROLS = [
   {
     key: 'csrfProtection',
     label: 'CSRF Protection',
-    description: 'CSRF protection is planned for a later phase.',
-    implemented: false,
+    description:
+      'Requires a session-bound CSRF token on state-changing transfer requests.',
+    implemented: true,
   },
   {
     key: 'secureCookies',
@@ -130,6 +131,7 @@ export default function Security() {
   }
 
   const sqliOn = config.sqlInjection;
+  const csrfOn = config.csrfProtection;
 
   return (
     <div className="space-y-6">
