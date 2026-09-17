@@ -5,6 +5,7 @@ const {
   isValidEmail,
   isValidPassword,
   isNonEmptyString,
+  sanitizeText,
   generateAccountNumber,
 } = require('../utils/validate');
 const { getSecurityConfig } = require('../security/securityConfig');
@@ -18,15 +19,25 @@ const STARTING_BALANCE = '10000.00';
 // POST /api/auth/register
 router.post('/register', async (req, res, next) => {
   const { name, email, password } = req.body || {};
+  const config = getSecurityConfig();
 
-  if (!isNonEmptyString(name, 120)) {
+  if (config.inputValidation && !isNonEmptyString(name, 120)) {
     return res.status(400).json({ error: 'Name is required' });
   }
-  if (!isValidEmail(email)) {
+  if (config.inputValidation && !isValidEmail(email)) {
     return res.status(400).json({ error: 'A valid email is required' });
   }
-  if (!isValidPassword(password)) {
+  if (config.inputValidation && !isValidPassword(password)) {
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
+  const safeName = config.xssProtection && typeof name === 'string' ? sanitizeText(name, 120).trim() : name;
+  const registrationName = typeof safeName === 'string' ? safeName.trim() : safeName;
+
+  if (config.xssProtection && !isNonEmptyString(registrationName, 120)) {
+    return res.status(400).json({
+      error: 'Name contains invalid content or cannot be empty',
+    });
   }
 
   const client = await pool.connect();
@@ -46,7 +57,7 @@ router.post('/register', async (req, res, next) => {
       `INSERT INTO users (name, email, password_hash)
        VALUES ($1, $2, $3)
        RETURNING id, name, email, phone, address, created_at`,
-      [name.trim(), normalizedEmail, passwordHash]
+      [registrationName, normalizedEmail, passwordHash]
     );
     const user = userResult.rows[0];
 

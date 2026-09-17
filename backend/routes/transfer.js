@@ -1,7 +1,8 @@
 const express = require('express');
 const pool = require('../db/pool');
 const { requireAuth } = require('../middleware/auth');
-const { isValidAmount, isNonEmptyString } = require('../utils/validate');
+const { isValidAmount, isNonEmptyString, isValidAccountNumber, sanitizeText } = require('../utils/validate');
+const { getSecurityConfig } = require('../security/securityConfig');
 
 const router = express.Router();
 
@@ -10,22 +11,29 @@ router.use(requireAuth);
 // POST /api/transfer
 router.post('/', async (req, res, next) => {
   const { recipientAccountNumber, amount, description } = req.body || {};
+  const config = getSecurityConfig();
 
-  if (typeof recipientAccountNumber !== 'string' || recipientAccountNumber.trim().length === 0) {
+  const normalizedRecipient = typeof recipientAccountNumber === 'string' ? recipientAccountNumber.trim() : recipientAccountNumber;
+  if (config.inputValidation && !isValidAccountNumber(normalizedRecipient)) {
+    return res.status(400).json({ error: 'Recipient account number must be 12 digits' });
+  }
+  if (!config.inputValidation && (typeof recipientAccountNumber !== 'string' || recipientAccountNumber.trim().length === 0)) {
     return res.status(400).json({ error: 'Recipient account number is required' });
   }
-  if (!isValidAmount(amount)) {
+  if (config.inputValidation && !isValidAmount(amount)) {
     return res.status(400).json({ error: 'Amount must be a positive number with at most 2 decimal places' });
   }
-  if (description !== undefined && description !== null) {
+  if (config.inputValidation && description !== undefined && description !== null) {
     if (typeof description !== 'string' || description.length > 255) {
       return res.status(400).json({ error: 'Description is too long' });
     }
   }
 
   const transferAmount = Number(amount).toFixed(2);
-  const recipientNumber = recipientAccountNumber.trim();
-  const safeDescription = isNonEmptyString(description, 255) ? description.trim() : 'Transfer';
+  const recipientNumber = typeof normalizedRecipient === 'string' ? normalizedRecipient : '';
+  const safeDescription = config.xssProtection
+    ? sanitizeText(isNonEmptyString(description, 255) ? description.trim() : 'Transfer', 255)
+    : isNonEmptyString(description, 255) ? description.trim() : 'Transfer';
 
   const client = await pool.connect();
   try {

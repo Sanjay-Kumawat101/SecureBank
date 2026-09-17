@@ -19,8 +19,6 @@ function LockIcon(props) {
 }
 
 // implemented: true -> actually wired into a backend route right now.
-// implemented: false -> control exists (stored + toggleable) but no route
-// reads it yet; reserved for a later phase (XSS, IDOR, CSRF, ...).
 const CONTROLS = [
   {
     key: 'sqlInjection',
@@ -32,43 +30,43 @@ const CONTROLS = [
   {
     key: 'inputValidation',
     label: 'Input Validation',
-    description: 'Reserved for a later phase.',
-    implemented: false,
+    description: 'Validates profile, transfer, search, date, and account-number inputs.',
+    implemented: true,
   },
   {
     key: 'xssProtection',
     label: 'XSS Protection',
-    description: 'Reserved for a later phase.',
-    implemented: false,
+    description: 'Strips markup and control characters from user-controlled text before storage.',
+    implemented: true,
   },
   {
     key: 'authorization',
     label: 'Authorization / IDOR Protection',
-    description: 'Reserved for a later phase.',
-    implemented: false,
+    description: 'Restricts account and transaction lookups to objects owned by the logged-in user.',
+    implemented: true,
   },
   {
     key: 'csrfProtection',
     label: 'CSRF Protection',
-    description: 'Reserved for a later phase.',
+    description: 'CSRF protection is planned for a later phase.',
     implemented: false,
   },
   {
     key: 'secureCookies',
     label: 'Secure Cookies',
-    description: 'Reserved for a later phase.',
+    description: 'Secure cookie hardening is planned for a later phase.',
     implemented: false,
   },
   {
     key: 'rateLimiting',
     label: 'Rate Limiting',
-    description: 'Reserved for a later phase.',
+    description: 'Rate limiting is planned for a later phase.',
     implemented: false,
   },
   {
     key: 'securityHeaders',
     label: 'Security Headers',
-    description: 'Reserved for a later phase.',
+    description: 'Security headers are planned for a later phase.',
     implemented: false,
   },
 ];
@@ -141,9 +139,9 @@ export default function Security() {
           <h1 className="text-2xl font-bold">Security Center</h1>
         </div>
         <p className="text-security-light/90 max-w-2xl">
-          Phase 2: SQL Injection. Flip the SQL Injection Protection control below between Secure
-          Mode and Vulnerable Lab Mode, then attempt the same login request both times — the
-          Attack Logs panel records what happened each time.
+          Phase 3 adds input validation, XSS sanitization, and object-level authorization on top
+          of the SQL Injection lab. Each implemented control can be switched between Secure Mode
+          and Vulnerable Lab Mode for local testing.
         </p>
       </div>
 

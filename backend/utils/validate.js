@@ -12,6 +12,26 @@ function isNonEmptyString(value, maxLen = 255) {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= maxLen;
 }
 
+function isValidAccountNumber(accountNumber) {
+  return typeof accountNumber === 'string' && /^\d{12}$/.test(accountNumber);
+}
+
+function isValidDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+// These fields are rendered as text, never HTML. Strip markup before storing
+// them so API consumers that render responses unsafely are protected too.
+function sanitizeText(value, maxLen = 255) {
+  if (typeof value !== 'string') return value;
+  return value
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/<[^>]*>/g, '')
+    .slice(0, maxLen);
+}
+
 function isValidAmount(amount) {
   const n = Number(amount);
   return Number.isFinite(n) && n > 0 && Math.round(n * 100) / 100 === n;
@@ -36,7 +56,10 @@ module.exports = {
   isValidEmail,
   isValidPassword,
   isNonEmptyString,
+  isValidAccountNumber,
+  isValidDate,
   isValidAmount,
+  sanitizeText,
   generateAccountNumber,
   maskAccountNumber,
 };
