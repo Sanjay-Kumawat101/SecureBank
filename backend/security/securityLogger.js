@@ -53,18 +53,33 @@ async function logSecurityEvent({
 async function getRecentEvents({ limit = 50, type = null } = {}) {
   const cappedLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
 
+  const baseQuery = `
+    SELECT
+      security_logs.*,
+      users.name AS user_name
+    FROM security_logs
+    LEFT JOIN users
+      ON security_logs.user_id = users.id
+  `;
+
   if (type) {
     const { rows } = await pool.query(
-      `SELECT * FROM security_logs WHERE type = $1 ORDER BY created_at DESC LIMIT $2`,
+      `${baseQuery}
+       WHERE security_logs.type = $1
+       ORDER BY security_logs.created_at DESC
+       LIMIT $2`,
       [type, cappedLimit]
     );
     return rows;
   }
 
   const { rows } = await pool.query(
-    `SELECT * FROM security_logs ORDER BY created_at DESC LIMIT $1`,
+    `${baseQuery}
+     ORDER BY security_logs.created_at DESC
+     LIMIT $1`,
     [cappedLimit]
   );
+
   return rows;
 }
 

@@ -1,14 +1,17 @@
 # SecureBank
 
-A full\-stack demo banking web app built for a security\-education project. It's
-built in phases: Phase 1 is a fully functional, secure\-by\-default banking
-application; Phase 2 adds the first vulnerability\-education module (SQL
-Injection) on top of it, with a lab toggle to switch the same code path
-between a secure and a deliberately vulnerable implementation.
+A full-stack demo banking web app built for a security-education project. It's
+built in phases: Phase 1 is a fully functional banking application; Phase 2
+adds SQL Injection testing; Phase 3 adds input validation, XSS protection, and
+object-level authorization; and Phase 4 adds CSRF protection, session security,
+rate limiting, and security headers.
+
+Each security control can be switched between Secure Mode and Vulnerable Lab
+Mode from the authenticated Security Center, allowing the same application
+behavior to be tested before and after the protection is enabled.
 
 No Docker required — this runs against any PostgreSQL instance you already
-have (local install or a hosted database), using a connection string you
-provide.
+have (local install or a hosted database), using a connection string you provide.
 
 * * *
 
@@ -329,6 +332,64 @@ advanced UNION\-based payload could achieve a full bypass; that's a possible
 stretch addition, not part of the current implementation.
 
 * * *
+### Security features added in Phase 4
+
+Phase 4 completes the remaining security controls with protections for
+state-changing requests, sessions, repeated login attempts, and browser
+security headers.
+
+- **CSRF protection:** Transfer requests require a session-bound
+  `X-CSRF-Token` in Secure Mode. In Vulnerable Lab Mode, token validation is
+  skipped so the same transfer can be submitted without the token.
+
+- **Session security:** Secure Mode regenerates the session ID after successful
+  authentication and uses protected session-cookie settings such as HttpOnly
+  and SameSite. In Vulnerable Lab Mode, the existing session ID is reused and
+  cookie protections are disabled for demonstration.
+
+- **Rate limiting:** Login requests are limited to 5 requests within 60
+  seconds per client IP in Secure Mode. The 6th request is blocked with HTTP
+  `429 Too Many Requests`. In Vulnerable Lab Mode, the rate limiter is disabled.
+
+- **Security headers:** Secure Mode adds security headers including
+  `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and a
+  Content Security Policy. In Vulnerable Lab Mode, these headers are removed.
+
+- **User-aware Attack Logs:** Security events associated with an authenticated
+  user display the user's name in the Security Center. Events occurring before
+  authentication, such as login SQL injection attempts and rate-limit blocks,
+  remain unaffiliated with a user.
+
+### Testing Phase 4
+
+Start the backend and frontend, log in, and open the **Security Center**.
+
+**CSRF protection:** With CSRF Protection ON, submit a transfer without the
+`X-CSRF-Token` header using the browser's Developer Tools; the request should
+return `403`. Turn the control OFF and repeat the request; it should be
+accepted. Turn the control back ON afterward.
+
+**Session security:** Log in with Session Security ON and inspect
+`F12 → Application → Cookies`. The `securebank.sid` cookie should have
+HttpOnly enabled and SameSite set to `Lax`. Turn Session Security OFF and
+repeat the login; the cookie protections should be disabled for the lab
+demonstration. On localhost over HTTP, the Secure cookie flag is not expected
+to be enabled.
+
+**Rate limiting:** With Rate Limiting ON, submit 6 login requests within
+60 seconds from the same client. The first 5 are processed normally and the
+6th should return `429 Too Many Requests`. Turn the control OFF and repeat;
+requests should no longer be blocked by the rate limiter.
+
+**Security headers:** With Security Headers ON, open `F12 → Network`, select
+an API request, and inspect the Response Headers for
+`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and
+`Content-Security-Policy`. Turn the control OFF and repeat; these headers
+should no longer be present.
+
+**Attack Logs:** After testing, use the Attack Logs section to verify the
+security events. Authenticated actions should display the associated username,
+while unauthenticated login-related events should not.
 
 ## Notes / known gaps
 

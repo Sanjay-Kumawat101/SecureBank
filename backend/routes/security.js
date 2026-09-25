@@ -63,7 +63,7 @@ router.put('/config', async (req, res, next) => {
       endpoint: '/api/security/config',
       status: value ? 'SECURED' : 'VULNERABLE_MODE_ENABLED',
       mode: value ? 'SECURE' : 'VULNERABLE',
-      detail: `${key} turned ${value ? 'ON (secure)' : 'OFF (vulnerable lab mode)'} by user #${req.userId}`,
+      detail: `${key} turned ${value ? 'ON (secure)' : 'OFF (vulnerable lab mode)'} `,
       ip: req.ip,
       userId: req.userId,
     });
