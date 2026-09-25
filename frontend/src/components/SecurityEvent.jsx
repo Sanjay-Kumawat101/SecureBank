@@ -33,9 +33,22 @@ export default function SecurityEvent({ event }) {
             <Badge variant={event.mode === 'VULNERABLE' ? 'danger' : 'success'}>{event.mode}</Badge>
           )}
         </div>
-        {event.endpoint && <p className="text-xs text-gray-400 mt-1 font-mono">{event.endpoint}</p>}
+        {event.endpoint && (
+          <p className="text-xs text-gray-400 mt-1 font-mono">
+            {event.endpoint}
+          </p>
+        )}
+
         {event.detail && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-words">{event.detail}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-words">
+            {event.detail}
+          </p>
+        )}
+
+        {event.user_name && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            User: <span className="font-medium">{event.user_name}</span>
+          </p>
         )}
       </div>
       <div className="text-right shrink-0">

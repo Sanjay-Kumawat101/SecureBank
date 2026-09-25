@@ -90,9 +90,7 @@ export default function Login() {
             </Link>
           </p>
         </Card>
-        <p className="text-center text-navy-300 text-xs mt-6">
-          Phase 1 demo &mdash; secure-by-default banking baseline
-        </p>
+        
       </div>
     </div>
   );
