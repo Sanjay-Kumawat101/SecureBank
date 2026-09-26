@@ -16,6 +16,7 @@ import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { formatINR, formatDate, getGreeting } from '../utils/format';
 import { Link } from 'react-router-dom';
+import SecurityText from '../components/SecurityText';
 
 function StatCard({ label, value, tone }) {
   const toneClasses = {
@@ -99,7 +100,8 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-          {getGreeting()}, {user?.name?.split(' ')[0]}
+          {getGreeting()},{' '}
+          <SecurityText value={user?.name?.split(' ')[0]} />
         </h1>
         <p className="text-gray-400 text-sm mt-1">Here&apos;s what&apos;s happening with your money today.</p>
       </div>
@@ -163,7 +165,9 @@ export default function Dashboard() {
             {recent.map((t) => (
               <li key={t.id} className="py-3 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-100 truncate">{t.description}</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-100 truncate">
+                    <SecurityText value={t.description} />
+                  </p>
                   <p className="text-xs text-gray-400">{formatDate(t.createdAt)}</p>
                 </div>
                 <span

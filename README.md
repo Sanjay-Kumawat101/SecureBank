@@ -285,8 +285,14 @@ range. Each request should be rejected with a `400` response and an error
 message.
 
 **XSS protection:** set a profile field or transfer description to
-`<script>alert(1)</script>`. The script must not execute, and the returned or
-displayed text should be sanitized. Restore the field after testing.
+`<img src=x onerror="alert('XSS-DEMO')">`. With the control ON, the event must
+not execute and the returned or displayed text should be sanitized. For the
+local Vulnerable Lab Mode demonstration, turn XSS Protection OFF and repeat
+the test; the event should execute when the value is rendered. Restore the
+field and turn the control back ON afterward. A `<script>` tag is also safe
+to use for the protected-mode test, but browsers do not execute script tags
+inserted through `innerHTML`, so the event-handler payload gives a reliable
+lab-mode execution check.
 
 **Authorization / IDOR:** while logged in as User A, open the browser
 Developer Tools (`F12`), select the Console, and first get User A's account

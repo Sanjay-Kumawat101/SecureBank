@@ -5,6 +5,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [securityConfig, setSecurityConfig] = useState({ xssProtection: true });
   const [loading, setLoading] = useState(true);
 
   const refreshProfile = useCallback(async () => {
@@ -18,13 +19,26 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const refreshSecurityConfig = useCallback(async () => {
+    try {
+      const { data } = await api.get('/security/config');
+      setSecurityConfig(data.config || { xssProtection: true });
+      return data.config;
+    } catch (err) {
+      console.error('Could not load security configuration', err);
+      setSecurityConfig({ xssProtection: true });
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
       await refreshProfile();
+      await refreshSecurityConfig();
       setLoading(false);
     })();
-  }, [refreshProfile]);
+  }, [refreshProfile, refreshSecurityConfig]);
 
   const login = useCallback(async (email, password) => {
     await api.post('/auth/login', { email, password });
@@ -52,6 +66,8 @@ export function AuthProvider({ children }) {
     register,
     logout,
     refreshProfile,
+    refreshSecurityConfig,
+    xssProtection: securityConfig.xssProtection !== false,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

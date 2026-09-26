@@ -1,5 +1,6 @@
 import React from 'react';
 import { initialsOf } from '../utils/format';
+import SecurityText from './SecurityText';
 
 function BellIcon(props) {
   return (
@@ -44,7 +45,7 @@ export default function Navbar({ user, onMenuClick, darkMode, onToggleDark }) {
             {initialsOf(user?.name)}
           </div>
           <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-gray-100">
-            {user?.name}
+            <SecurityText value={user?.name} />
           </span>
         </div>
       </div>

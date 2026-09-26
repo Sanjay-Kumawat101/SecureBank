@@ -7,6 +7,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import api from '../api/client';
 import { useToast } from '../context/ToastContext';
 import { formatINR } from '../utils/format';
+import SecurityText from '../components/SecurityText';
 
 export default function Transfer() {
   const [account, setAccount] = useState(null);
@@ -280,7 +281,7 @@ export default function Transfer() {
             </span>
 
             <span>
-              {form.description || 'Transfer'}
+              <SecurityText value={form.description || 'Transfer'} />
             </span>
           </div>
         </div>

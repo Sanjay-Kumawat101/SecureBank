@@ -8,6 +8,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
 import api from '../api/client';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 
 function LockIcon(props) {
   return (
@@ -81,6 +82,7 @@ export default function Security() {
   const [loading, setLoading] = useState(true);
   const [togglingKey, setTogglingKey] = useState(null);
   const { showToast } = useToast();
+  const { refreshSecurityConfig } = useAuth();
 
   const loadConfig = useCallback(async () => {
     const { data } = await api.get('/security/config');
@@ -111,6 +113,7 @@ export default function Security() {
     try {
       const { data } = await api.put('/security/config', { key, value: nextValue });
       setConfig(data.config);
+      await refreshSecurityConfig();
       showToast(
         nextValue
           ? `${key} switched to Secure Mode`

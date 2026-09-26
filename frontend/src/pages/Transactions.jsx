@@ -8,6 +8,7 @@ import Badge from '../components/Badge';
 import LoadingSpinner from '../components/LoadingSpinner';
 import api from '../api/client';
 import { formatINR, formatDate } from '../utils/format';
+import SecurityText from '../components/SecurityText';
 
 export default function Transactions() {
   const [transactions, setTransactions] = useState([]);
@@ -57,7 +58,12 @@ export default function Transactions() {
     {
       key: 'description',
       header: 'Description',
-      render: (row) => <span className="font-medium text-gray-700 dark:text-gray-100">{row.description}</span>,
+      render: (row) => (
+        <SecurityText
+          value={row.description}
+          className="font-medium text-gray-700 dark:text-gray-100"
+        />
+      ),
     },
     { key: 'createdAt', header: 'Date', render: (row) => formatDate(row.createdAt) },
     {
@@ -158,7 +164,7 @@ export default function Transactions() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Description</span>
-              <span>{selected.description}</span>
+              <SecurityText value={selected.description} />
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Amount</span>
